@@ -1,8 +1,8 @@
 # https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE152075
 library(tidyverse)
+library(ggplot2)
 
-# dplyr::rowwise
-
+### Import data ###
 filepath_1 = '/Users/ericaspada/Desktop/projects/COV/GSE152075_series_matrix.txt'
 filepath_2 = '/Users/ericaspada/Desktop/projects/COV/GSE152075_raw_counts_GEO.txt'
 metadata = read_tsv(filepath_1)
@@ -12,7 +12,8 @@ str(metadata)
 head(rawCounts)
 str(rawCounts)
 
-rawCounts_t = as.data.frame(t(rawCounts))# transpose rawCounts to prepare for merging
+### Clean and merge the raw data ### 
+rawCounts_t = as.data.frame(t(rawCounts)) # transpose rawCounts to prepare for merging
 rawCounts_t[1:25,1:25] # examine
 gene_names = pull(rawCounts,Gene)
 colnames(rawCounts_t) = gene_names
@@ -32,7 +33,7 @@ metadata_keep = rename(metadata_keep,covidPositive=V4) # rename columns
 
 # unique(metadata_keep[,'sequencingBatch'])
 # unique(metadata_keep[,'covidPositive'])
-unique(metadata_keep[,'age'])
+# unique(metadata_keep[,'age'])
 
 # the age, gender, and positive values need to be parsed from text strings
 metadata_final = metadata_keep %>%
@@ -101,7 +102,7 @@ to_remove #examine
 data_cleaned = data %>%
   select(-all_of(to_remove))
 
-# plot some of the samples from the cleaned dataset
+# plot some samples from the cleaned dataset
 sample1 = as.numeric(data_cleaned[22,6:length(data_cleaned)]) # a random observation
 hist(sample1, breaks=300) # difficult to see
 sample1_transformed = log2(sample1+1) # use log2(k+1) transformation to help visualize
@@ -110,15 +111,12 @@ sample2 = as.numeric(data_cleaned[11,6:length(data_cleaned)])
 sample2_transformed = log2(sample2+1)
 hist(sample2_transformed, breaks=50)
 
-# in order to use PCA, it's best to make the counts homoskedastic
-# how to transform the data before PCA?
-
 genes = colnames(data_cleaned[6:length(data_cleaned)])
 
-### Normalization of read counts ###
+### Normalization of raw read counts ###
 # Step 1: Need to normalize the raw read counts to account for library size (also known as read depth: total number of reads per sample)
-# this is to account for between sample effects
-# try implementing the median of ratios method which DESeq2 uses
+# This is to account for between sample effects
+# Implement the median of ratios method which the DESeq2 package uses
 
 data_norm_1 = data_cleaned[,6:19976] + 1 # add one to account for 0s
 data_norm_1[1:25,1:25]
@@ -126,16 +124,32 @@ data_norm_1 = log(data_norm_1) # take the natural log
 averages = sapply(data_norm_1, mean) # take the average of each column (gene) (this is the geometric average)
 averages[1:50]
 data_norm_2 = sweep(data_norm_1, 2, averages) # subtract the averages from the log counts
-# sweep takes a matrix and subtracts from it either column or row-wise
+# sweep operates on a matrix either column or row-wise (subtraction is the default)
 data_norm_2[16,4]
 data_norm_1[16,4] - averages[4] # manual check
-# log(a)-log(b) = log(a/b) -- so this results in the ratio of read count to average read count 
 medians = apply(data_norm_2, 1, median) # calculate the median for each sample (each row) - this should return of vector of length 484
-# exponentiate the medians to convert back to reads
 medians_e = exp(medians) # exponentiate the medians to convert back to reads - these are the scaling factors for each sample
 data_norm = sweep(data_cleaned[,6:19976], 1, medians_e, '/') # divide the original read counts by the scaling factors
 
-# Step 2: need to scale and transform the data to stabilize the variance
+# look at the distribution of some samples
+sample1 = as.numeric(data_norm[200,6:length(data_norm)]) # a random observation
+hist(sample1, breaks=100) # difficult to see
+sample1_transformed = log2(sample1+1) # use log2(k+1) transformation to help visualize
+hist(sample1_transformed, breaks=50)
+sample2 = as.numeric(data_norm[41,6:length(data_norm)])
+hist(sample2, breaks=100)
+sample2_transformed = log2(sample2+1)
+hist(sample2_transformed, breaks=50)
+# these appear more like negative binomial
+
+### Transformation of the normalized read counts to prepare for PCA ###
+data_norm_log2 = log2(data_norm + 1)
+pca = prcomp(data_norm_log2, center=TRUE, scale.=TRUE) # run PCA with scale=true and center=true
+summary(pca)
+biplot = ggplot(data=pca$x)+
+  aes(x=pca$x[,1], y=pca$x[,2], col=data$covidPositive)+
+  geom_point()  # plot the first two PCs
+biplot
 
 
 
