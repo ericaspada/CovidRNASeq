@@ -146,10 +146,22 @@ hist(sample2_transformed, breaks=50)
 data_norm_log2 = log2(data_norm + 1)
 pca = prcomp(data_norm_log2, center=TRUE, scale.=TRUE) # run PCA with scale=true and center=true
 summary(pca)
-biplot = ggplot(data=pca$x)+
+
+### Create bi-plots ###
+biplot_covidPositive = ggplot(data=pca$x)+
   aes(x=pca$x[,1], y=pca$x[,2], col=data$covidPositive)+
-  geom_point()  # plot the first two PCs
-biplot
+  geom_point()  # plot the first two PCs and color on covidPositive
+biplot_covidPositive
+
+biplot_ageGroup = ggplot(data=pca$x)+
+  aes(x=pca$x[,1], y=pca$x[,2], col=data$ageGroup)+
+  geom_point()  # plot the first two PCs and color on ageGroup
+biplot_ageGroup
+
+biplot_gender = ggplot(data=pca$x)+
+  aes(x=pca$x[,1], y=pca$x[,2], col=data$gender)+
+  geom_point()  # plot the first two PCs and color on gender
+biplot_gender
 
 
 
